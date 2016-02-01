@@ -1,0 +1,125 @@
+#%RAML 0.8
+title: Go4it API
+baseUri: http://localhost/go4it-api/index.php
+version: v1
+mediaType:  application/json
+
+schemas:
+  - users: !include users.json
+  - user: !include user.json
+
+traits: 
+  - oauth2:
+        usage: Apply this trait to support OAuth 2.0 authentication.
+        description: |
+          Supports OAuth 2.0 for authenticating all API requests.
+        headers:
+          Authorization :
+            description: |
+              Used to send a valid OAuth2 access token.
+            type: string
+            required: true
+            example: Bearer access_token
+        responses:
+          401:
+            description: |
+              Given request is unauthorized. Bad or expired token. Reauthenticate
+              the user. Any details will be provided within the response payload.
+          403:
+            description: |
+              Evaluated request scopes in access token are not sufficient and do not match required scopes.
+    sort:
+      usage: Apply this trait to support limit and sort.
+      description: Supports limit and sort all API requests.
+      queryParameters:
+        limit:
+          description: Used to limit the return
+          type: integer
+        sort:
+          description: Used to sort the return
+          type: string
+    tenant:
+        usage: Apply this trait to support Tenant information.
+        description: |
+          Supports tenant for authenticating all API requests.
+        headers:
+          Tenant:
+            description: |
+              Used to use the right site
+            type: string
+            required: true
+        
+/users:
+  get:
+    is: [oauth2, tenant]
+    description: Gets all users
+    responses:
+      200:
+        body:
+          application/json:
+            schema: users
+  post:
+    is: [oauth2, tenant]
+    description: Add a user
+    body:
+      application/json:
+        schema: user
+    responses:
+        201:
+          description: The resource has been successfully created
+        500:
+          description: Some server side error occurred.  
+  /{userId}:
+    uriParameters:
+      userId:
+        description: the id of the user to work on
+        example: 784hti8ey
+        type: string
+    get:
+      is: [oauth2, tenant]
+      description: Updates a user
+      responses:
+        200:
+          body:
+            application/json:
+              schema: user
+        500:
+          description: Some server side error occurred.
+    
+    put:
+      is: [oauth2, tenant]
+      description: Updates a user
+      body:
+        application/json:
+          schema: user
+      responses:
+        200:
+          description: The resource has been successfully updated
+        500:
+          description: Some server side error occurred.
+
+    delete:
+      is: [oauth2, tenant]
+      description: Deletes a user
+      responses:
+        204:
+          description: The resource has been successfully deleted.
+        500:
+          description: Some server side error occurred.
+
+/auth:
+  /google:
+    get:
+      description: google oauth2
+    /me:
+      get:
+        is: [oauth2, tenant]
+        description: Get logined user
+        responses:
+          200:
+            body:
+              application/json:
+                schema: user
+    /callback:
+      get:
+        description: google oauth2 callback                

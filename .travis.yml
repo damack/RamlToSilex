@@ -1,0 +1,6 @@
+language: php
+before_script:
+    - composer install
+script: composer test
+php:
+  - '7.0'

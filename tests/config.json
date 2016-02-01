@@ -1,0 +1,13 @@
+{
+    "routeAccess": {
+        "GET /users": "Admin, Describer",
+        "POST /users": "Admin",
+        "GET /users/{userId}": "Admin",
+        "PUT /users/{userId}": "Admin",
+        "DELETE /users/{userId}": "Admin",
+        "GET /auth/google/me": "Admin, Describer, Anonymous"
+    },
+    "controler": {
+
+    }
+}
