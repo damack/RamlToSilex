@@ -1,0 +1,17 @@
+{
+    "routeAccess": {
+        "GET /users": "Admin, Describer",
+        "POST /users": "Admin",
+        "GET /users/{userId}": "Admin",
+        "PUT /users/{userId}": "Admin",
+        "DELETE /users/{userId}": "Admin",
+        "PUT /users/{userId}/test": "Admin",
+        "GET /auth/google/me": "Admin, Describer, Anonymous"
+    },
+    "controllers": {
+        "PUT /users/{userId}/test": {
+            "action": "ramlToSilex.customController:testAction",
+            "objectType": "users"
+        }
+    }
+}
