@@ -11,10 +11,10 @@ RamlToSilex is a Silex provider to setting up a REST API on top of a relational 
 To install RamlToSilex library, run the command below and you will get the latest version:
 
 ```bash
-composer require damack/ramlToSilex
+composer require damack/ramltosilex
 ```
 
-Enable `ServiceController`, `Doctrine` and `Microrest` service providers in your application:
+Enable `ServiceController`, `Doctrine` and `RamlToSilex` service providers in your application:
 
 ```php
 $app = new Application();

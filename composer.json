@@ -1,5 +1,5 @@
 {
-    "name": "damack/ramlToSilex",
+    "name": "damack/ramltosilex",
     "description": "Silex Provider that generates REST API from a RAML description file",
     "license": "MIT",
     "authors": [
