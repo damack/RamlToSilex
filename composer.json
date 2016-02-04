@@ -17,7 +17,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Damack\\RamlToSilex\\": "src/"
+            "Damack\\RamlToSilex\\": "src/",
+            "Damack\\Custom\\": "tests/controller/"
         }
     },
     "require-dev": {

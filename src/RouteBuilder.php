@@ -21,8 +21,10 @@ class RouteBuilder
                 $data = json_decode($request->getContent(), true);
                 $request->request->replace(is_array($data) ? $data : array());
             }
-            if ($this->checkIfAccessAllowed($request, $app) == false) {
-                return new Response('', 401);
+            if($app['ramlToSilex.routeAccess']) {
+                if ($this->checkIfAccessAllowed($request, $app) == false) {
+                    return new Response('', 401);
+                }
             }
         };
 
@@ -48,8 +50,14 @@ class RouteBuilder
                 $route['type'] = 'List';
                 $route['objectType'] = strtolower(str_replace('/', '', $route['path']));
             }
-
-            $action = 'ramlToSilex.restController:'.strtolower($route['method']).$route['type'].'Action';
+            if (property_exists($app['ramlToSilex.customControllerMapping'], $routePath) && $app['ramlToSilex.customControllerMapping']->{$routePath}) {
+                $mapping = $app['ramlToSilex.customControllerMapping']->{$routePath};
+                $action = $mapping->action;
+                $route['objectType'] = $mapping->objectType;
+                $route['type'] = 'CustomAction';
+            } else {
+                $action = 'ramlToSilex.restController:'.strtolower($route['method']).$route['type'].'Action';
+            }
             $name = 'ramlToSilex.'.strtolower($route['method']).ucfirst($route['objectType']).$route['type'];
 
             $controllers

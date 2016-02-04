@@ -4,7 +4,6 @@ namespace Damack\RamlToSilex;
 
 use Silex\Application;
 use League\OAuth2\Client\Provider\Google;
-use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Schema;
 use Pagerfanta\Adapter\DoctrineDbalAdapter;
 use Pagerfanta\Pagerfanta;

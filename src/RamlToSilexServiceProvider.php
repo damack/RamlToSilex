@@ -15,10 +15,15 @@ class RamlToSilexServiceProvider implements ServiceProviderInterface
                 throw new \RuntimeException("API config file is not readable");
             }
 
+            $configFile = json_decode(file_get_contents($app['ramlToSilex.config_file']));
             $app['ramlToSilex.apiDefinition'] = (new Parser())->parse($ramlFile, false);
             $app['ramlToSilex.routes'] = $app['ramlToSilex.apiDefinition']->getResourcesAsUri()->getRoutes();
-            $app['ramlToSilex.routeAccess'] = json_decode(file_get_contents($app['ramlToSilex.config_file']))->routeAccess;
-
+            if (property_exists($configFile, 'routeAccess')) {
+                $app['ramlToSilex.routeAccess'] = $configFile->routeAccess;
+            }
+            if (property_exists($configFile, 'controllers')) {
+                $app['ramlToSilex.customControllerMapping'] = $configFile->controllers;
+            }
             $app['ramlToSilex.restController'] = $app->share(function () use ($app) {
                 return new RestController($app);
             });
@@ -26,6 +31,7 @@ class RamlToSilexServiceProvider implements ServiceProviderInterface
             $app['ramlToSilex.routeBuilder'] = $app->share(function () {
                 return new RouteBuilder();
             });
+
         });
 
         $app['ramlToSilex.builder'] = function () use ($app) {

@@ -3,6 +3,7 @@
 namespace Damack\RamlToSilex;
 
 use Damack\RamlToSilex\RamlToSilexServiceProvider;
+use Damack\Custom\CustomController;
 use Doctrine\DBAL\Schema\Schema;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
@@ -36,12 +37,11 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
      * @before
      */
     public function createApp() {
-        $this->app = new Application();
-        $this->app['debug'] = true;
+        $app = new Application();
+        $app['debug'] = true;
 
-        $this->app->register(new \Silex\Provider\ServiceControllerServiceProvider());
-        $this->app->register(new \Silex\Provider\FormServiceProvider());
-        $this->app->register(new \Silex\Provider\DoctrineServiceProvider(), array(
+        $app->register(new \Silex\Provider\ServiceControllerServiceProvider());
+        $app->register(new \Silex\Provider\DoctrineServiceProvider(), array(
             'dbs.options' => array(
                 'test' => array(
                     'driver' => 'pdo_sqlite',
@@ -49,14 +49,17 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
                 )
             ),
         ));
-
-        $this->app->register(new RamlToSilexServiceProvider(), array(
+        $app->register(new RamlToSilexServiceProvider(), array(
             'ramlToSilex.raml_file' => __DIR__ . '/raml/api.raml',
             'ramlToSilex.config_file' => __DIR__ . '/config.json',
             'ramlToSilex.google-app-id' => 'id',
             'ramlToSilex.google-app-secret' => 'secret',
-            'ramlToSilex.google-redirect-uri' => 'http://localhost/'
+            'ramlToSilex.google-redirect-uri' => 'http://localhost/',
+            'ramlToSilex.customController' => function() use ($app) {
+                return new CustomController($app);
+            }
         ));
+        $this->app = $app;
     }
 
     public function testGetList() {
@@ -120,5 +123,13 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $response = $this->app->handle($request);
 
         $this->assertEquals('{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":"1"}', $response->getContent());
+    }
+
+    public function testCustomController() {
+        $request = Request::create('/users/3/test', 'PUT');
+        $request->headers->set('Authorization', 'Bearer admin');
+        $request->headers->set('Tenant', 'test');
+        $response = $this->app->handle($request);
+        $this->assertEquals('{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1","token":"admin"}', $response->getContent());
     }
 }

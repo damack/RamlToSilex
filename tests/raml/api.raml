@@ -106,7 +106,15 @@ traits:
           description: The resource has been successfully deleted.
         500:
           description: Some server side error occurred.
-
+    /test:
+      put:
+        is: [oauth2, tenant]
+        description: Test custom action
+        responses:
+            201:
+              description: The resource has been successfully created
+            500:
+              description: Some server side error occurred.
 /auth:
   /google:
     get:
