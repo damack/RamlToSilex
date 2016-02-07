@@ -140,13 +140,17 @@ class RestController
         $gUser = $this->provider->getResourceOwner($token);
 
         $this->createTable($tenant, $objectType);
-        $user = $this->dbal[$tenant]->fetchAssoc('SELECT * FROM '.$objectType.' WHERE mail = ?', array($gUser->getEmail()));
+        $user = $this->dbal[$tenant]->fetchObject('SELECT * FROM '.$objectType.' WHERE mail = ?', array($gUser->getEmail()));
         if ($user == null) {
             $this->dbal[$tenant]->insert($objectType, array(
                 "name" => $gUser->getName(),
                 "mail" => $gUser->getEmail(),
                 "token" => $token
             ));
+        } else if ($user->token !== $token) {
+            $this->dbal[$tenant]->update($objectType, array(
+                "token" => $token
+            ), array('id' => $user->id));
         }
         return new RedirectResponse('https://'.$tenant.'/#/login?access_token='.$token);
     }
