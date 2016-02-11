@@ -71,7 +71,7 @@ class RouteBuilder
                 ->before($beforeMiddleware);
         }
 
-        if (array_key_exists('ramlToSilex.apiConsole', $app) && $app['ramlToSilex.apiConsole']) {
+        if ($app['ramlToSilex.apiConsole']) {
             $controllers->match('/', function() use ($app) {
                 return $app->redirect('vendor/damack/ramltosilex/api-console/');
             });
