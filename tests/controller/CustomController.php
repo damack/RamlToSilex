@@ -13,7 +13,7 @@ class CustomController
         $this->dbal = $app['dbs'];
     }
 
-    public function testAction($objectId, $objectType, Request $request) {
+    public function testAction($objectType, Request $request) {
         $tenant = $request->headers->get('Tenant');
         $token = $request->headers->get('Authorization') ? $request->headers->get('Authorization') : getallheaders()['Authorization'];
         $token = str_replace('Bearer ', '', $token);

@@ -38,17 +38,21 @@ class RouteBuilder
             }
 
             $availableRoutes[] = $index;
-
             if (preg_match('/auth/', $route['path'])) {
                 $route['type'] = str_replace('google', 'Google', str_replace('auth', 'Auth', str_replace('/', '', $route['path'])));
                 $route['objectType'] = 'users';
-            } else if (preg_match('/{[\w-]+}/', $route['path'], $identifier)) {
+            } else if (preg_match_all('/{[\w-]+}/', $route['path'], $identifier) && strrpos($route['path'], "}") === (strlen($route['path']) - 1)) {
                 $route['type'] = 'Object';
-                $route['objectType'] = strtolower(str_replace(array('/', $identifier[0]), '', $route['path']));
-                $route['path'] = str_replace($identifier[0], '{objectId}', $route['path']);
+                $route['objectType'] = strtolower(str_replace(array('/', $identifier[0][count($identifier[0]) - 1]), '', $route['path']));
+                $route['path'] = str_replace($identifier[0][count($identifier[0]) - 1], '{objectId}', $route['path']);
+
+                //object type is last element
+                if (strpos($route['objectType'], "}") !== false) {
+                    $route['objectType'] = substr(strrchr($route['objectType'], "}"), 1);
+                }
             } else {
                 $route['type'] = 'List';
-                $route['objectType'] = strtolower(str_replace('/', '', $route['path']));
+                $route['objectType'] = substr($route['path'], strrpos($route['path'], "/") + 1, strlen($route['path']));
             }
             if (property_exists($app['ramlToSilex.customControllerMapping'], $routePath) && $app['ramlToSilex.customControllerMapping']->{$routePath}) {
                 $mapping = $app['ramlToSilex.customControllerMapping']->{$routePath};
@@ -58,14 +62,12 @@ class RouteBuilder
             } else {
                 $action = 'ramlToSilex.restController:'.strtolower($route['method']).$route['type'].'Action';
             }
-            $name = 'ramlToSilex.'.strtolower($route['method']).ucfirst($route['objectType']).$route['type'];
 
             $controllers
                 ->match($route['path'], $action)
                 ->method($route['method'])
                 ->setDefault('objectType', $route['objectType'])
                 ->setDefault('path', $routePath)
-                ->bind($name)
                 ->before($beforeMiddleware);
         }
 

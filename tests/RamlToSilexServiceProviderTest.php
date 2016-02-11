@@ -1,5 +1,4 @@
 <?php
-
 namespace Damack\RamlToSilex;
 
 use Damack\RamlToSilex\RamlToSilexServiceProvider;
@@ -71,6 +70,15 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $this->assertEquals('[{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1"},{"id":"2","name":"Hans Walter Describer","mail":"hans.walter@gmail.com","role":"Describer","activ":"1"},{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":"1"}]', $response->getContent());
     }
 
+    public function testGetListQFilter() {
+        $request = Request::create('/users?q=role:Admin', 'GET');
+        $request->headers->set('Authorization', 'Bearer admin');
+        $request->headers->set('Tenant', 'test');
+        $response = $this->app->handle($request);
+
+        $this->assertEquals('[{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1"}]', $response->getContent());
+    }
+
     public function testGetListAnonymous() {
         $request = Request::create('/users', 'GET');
         $request->headers->set('Authorization', 'Bearer anonymous');
@@ -131,5 +139,30 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
         $this->assertEquals('{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1","token":"admin"}', $response->getContent());
+    }
+
+    public function testToDoPost() {
+        $request = Request::create('/users/1/todos', 'POST', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test"}');
+        $request->headers->set('Authorization', 'Bearer admin');
+        $request->headers->set('Tenant', 'test');
+        $response = $this->app->handle($request);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
+    public function testToDoGetList() {
+        $request = Request::create('/users/2/todos', 'GET');
+        $request->headers->set('Authorization', 'Bearer admin');
+        $request->headers->set('Tenant', 'test');
+        $response = $this->app->handle($request);
+
+        $this->assertEquals('[]', $response->getContent());
+
+        $request = Request::create('/users/1/todos', 'GET');
+        $request->headers->set('Authorization', 'Bearer admin');
+        $request->headers->set('Tenant', 'test');
+        $response = $this->app->handle($request);
+
+        $this->assertEquals('[{"id":"1","name":"Test"}]', $response->getContent());
     }
 }
