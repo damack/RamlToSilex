@@ -54,6 +54,7 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
             'ramlToSilex.google-app-id' => 'id',
             'ramlToSilex.google-app-secret' => 'secret',
             'ramlToSilex.google-redirect-uri' => 'http://localhost/',
+            'ramlToSilex.apiConsole' => false,
             'ramlToSilex.customController' => function() use ($app) {
                 return new CustomController($app);
             }
