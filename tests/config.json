@@ -6,6 +6,8 @@
         "PUT /users/{userId}": "Admin",
         "DELETE /users/{userId}": "Admin",
         "PUT /users/{userId}/test": "Admin",
+        "GET /users/{userId}/todos": "Admin",
+        "POST /users/{userId}/todos": "Admin",
         "GET /auth/google/me": "Admin, Describer, Anonymous"
     },
     "controllers": {

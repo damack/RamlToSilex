@@ -7,6 +7,8 @@ mediaType:  application/json
 schemas:
   - users: !include users.json
   - user: !include user.json
+  - todos: !include todos.json
+  - todo: !include todo.json
 
 traits: 
   - oauth2:
@@ -48,7 +50,7 @@ traits:
               Used to use the right site
             type: string
             required: true
-        
+            
 /users:
   get:
     is: [oauth2, tenant]
@@ -115,6 +117,26 @@ traits:
               description: The resource has been successfully created
             500:
               description: Some server side error occurred.
+    /todos:
+      get:
+        is: [oauth2, tenant]
+        description: Gets all todos for a user
+        responses:
+          200:
+            body:
+              application/json:
+                schema: todos
+      post:
+        is: [oauth2, tenant]
+        description: Add a new todo for a user
+        body:
+          application/json:
+            schema: todo
+        responses:
+            201:
+              description: The resource has been successfully created
+            500:
+              description: Some server side error occurred.  
 /auth:
   /google:
     get:

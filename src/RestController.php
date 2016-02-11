@@ -40,7 +40,13 @@ class RestController
             ->from($objectType, 'o')
         ;
 
-        if ($sort = $request->query->get('_sort')) {
+        $q = $request->query->get('q');
+        $foreignKeys = $this->getForeignKeys($request->attributes);
+        $where = $this->createWhere($queryBuilder, $q, $foreignKeys);
+        if ($where) {
+            $queryBuilder->where($where);
+        }
+        if ($sort = $request->query->get('sort')) {
             $queryBuilder->orderBy($sort, $request->query->get('_sortDir', 'ASC'));
         }
 
@@ -57,7 +63,7 @@ class RestController
         $results = $pager->getSlice($request->query->get('_start', 0), $request->query->get('_end', 20));
 
         foreach($results as &$obj) {
-            $this->removeHiddenFields($objectType, $obj);
+            $this->removeHiddenFields($objectType, $obj, $foreignKeys);
         }
 
         return new JsonResponse($results, 200, array(
@@ -68,9 +74,10 @@ class RestController
     public function postListAction($objectType, Request $request)
     {
         $tenant = $request->headers->get('Tenant');
-        $this->createTable($tenant, $objectType);
+        $foreignKeys = $this->getForeignKeys($request->attributes);
+        $this->createTable($tenant, $objectType, $foreignKeys);
         try {
-            $this->dbal[$tenant]->insert($objectType, $request->request->all());
+            $this->dbal[$tenant]->insert($objectType, array_merge($request->request->all(), $foreignKeys));
         } catch (\Exception $e) {
             return new JsonResponse(array(
                 'errors' => array('detail' => $e->getMessage()),
@@ -96,7 +103,7 @@ class RestController
         if (false === $result) {
             return new Response('', 404);
         }
-        $this->removeHiddenFields($objectType, $result);
+        $this->removeHiddenFields($objectType, $result, $this->getForeignKeys($request->attributes));
 
         return new JsonResponse($result, 200);
     }
@@ -140,13 +147,17 @@ class RestController
         $gUser = $this->provider->getResourceOwner($token);
 
         $this->createTable($tenant, $objectType);
-        $user = $this->dbal[$tenant]->fetchAssoc('SELECT * FROM '.$objectType.' WHERE mail = ?', array($gUser->getEmail()));
+        $user = $this->dbal[$tenant]->fetchObject('SELECT * FROM '.$objectType.' WHERE mail = ?', array($gUser->getEmail()));
         if ($user == null) {
             $this->dbal[$tenant]->insert($objectType, array(
                 "name" => $gUser->getName(),
                 "mail" => $gUser->getEmail(),
                 "token" => $token
             ));
+        } else if ($user->token !== $token) {
+            $this->dbal[$tenant]->update($objectType, array(
+                "token" => $token
+            ), array('id' => $user->id));
         }
         return new RedirectResponse('https://'.$tenant.'/#/login?access_token='.$token);
     }
@@ -170,7 +181,39 @@ class RestController
         return new JsonResponse($result, 200);
     }
 
-    private function removeHiddenFields($schemaName, &$obj) {
+    private function getForeignKeys($attributes) {
+        $return = array();
+        foreach($attributes as $key => $value) {
+            if(strpos($key, 'Id') && $key !== 'objectId') {
+                $return[$key] = $value;
+            }
+        }
+        return $return;
+    }
+
+    private function createWhere($queryBuilder, $q, $foreignKeys) {
+        $return = '';
+
+        if ($q) {
+            $qSplit = explode(',', $q);
+            foreach($qSplit as $value) {
+                $valueSplit = explode(':', $value);
+                if (strlen($return) > 0) {
+                    $return .= ',';
+                }
+                $return .= trim($valueSplit[0]) . "=" . $queryBuilder->createPositionalParameter($valueSplit[1]);
+            }
+        }
+        foreach($foreignKeys as $key => $value) {
+            if (strlen($return) > 0) {
+                $return .= ',';
+            }
+            $return .= $key . "=" . $queryBuilder->createPositionalParameter($value);
+        }
+        return $return;
+    }
+
+    private function removeHiddenFields($schemaName, &$obj, $foreignKeys = array()) {
         $apiDefinition = $this->app['ramlToSilex.apiDefinition'];
         foreach ($apiDefinition->getSchemaCollections() as $schema) {
             if (key($schema) == $schemaName) {
@@ -182,9 +225,12 @@ class RestController
                 }
             }
         }
+        foreach ($foreignKeys as $key => $value) {
+            unset($obj[$key]);
+        }
     }
 
-    private function createTable($tenant, $name) {
+    private function createTable($tenant, $name, $foreignKeys = []) {
         $findTable = false;
         $schema = $this->dbal[$tenant]->getSchemaManager();
 
@@ -224,6 +270,10 @@ class RestController
                                 $table->addColumn($key, $value->type, $property);
                             }
                         }
+                    }
+                    //Add foreign keys
+                    foreach($foreignKeys as $key => $value) {
+                        $table->addColumn($key, 'integer');
                     }
                 }
             }
