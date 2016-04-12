@@ -33,7 +33,8 @@ class RestController
     public function getListAction($objectType, Request $request)
     {
         $tenant = $request->headers->get('Tenant');
-        $this->createTable($tenant, $objectType);
+        $foreignKeys = $this->getForeignKeys($request->attributes);
+        $this->createTable($tenant, $objectType, $foreignKeys);
         $queryBuilder = $this->dbal[$tenant]
             ->createQueryBuilder()
             ->select('o.*')
@@ -41,13 +42,12 @@ class RestController
         ;
 
         $q = $request->query->get('q');
-        $foreignKeys = $this->getForeignKeys($request->attributes);
         $where = $this->createWhere($queryBuilder, $q, $foreignKeys);
         if ($where) {
             $queryBuilder->where($where);
         }
         if ($sort = $request->query->get('sort')) {
-            $queryBuilder->orderBy($sort, $request->query->get('_sortDir', 'ASC'));
+            $queryBuilder->orderBy(explode(',', $sort)[0], explode(',', $sort)[1]);
         }
 
         $countQueryBuilderModifier = function ($queryBuilder) {
@@ -60,7 +60,9 @@ class RestController
         $pager = new DoctrineDbalAdapter($queryBuilder, $countQueryBuilderModifier);
 
         $nbResults = $pager->getNbResults();
-        $results = $pager->getSlice($request->query->get('_start', 0), $request->query->get('_end', 20));
+        $page = $request->query->get('page', 1);
+        $size = $request->query->get('size', 20);
+        $results = $pager->getSlice(($page - 1) * $size, $page * $size);
 
         foreach($results as &$obj) {
             $this->removeHiddenFields($objectType, $obj, $foreignKeys);
@@ -86,7 +88,8 @@ class RestController
 
         $id = (integer) $this->dbal[$tenant]->lastInsertId();
 
-        return new Response($id, 201);
+
+        return new JsonResponse(array("id"=>$id), 201);
     }
 
     public function getObjectAction($objectId, $objectType, Request $request)
@@ -257,7 +260,7 @@ class RestController
                         if ($key != "id") {
                             $property = [];
 
-                            if (array_search($key, $schemaDef->items->required) != null) {
+                            if ($schemaDef->items->required && array_search($key, $schemaDef->items->required) != null) {
                                 $property["notnull"] = false;
                             }
                             if (property_exists($value, "default")) {
@@ -271,6 +274,7 @@ class RestController
                             }
                         }
                     }
+
                     //Add foreign keys
                     foreach($foreignKeys as $key => $value) {
                         $table->addColumn($key, 'integer');
