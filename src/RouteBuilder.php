@@ -71,7 +71,7 @@ class RouteBuilder
                 ->before($beforeMiddleware);
         }
 
-        if (array_key_exists('ramlToSilex.apiConsole', $app) && $app['ramlToSilex.apiConsole']) {
+        if ($app->get('ramlToSilex.apiConsole')) {
             $controllers->match('/', function() use ($app) {
                 return $app->redirect('vendor/damack/ramltosilex/api-console/');
             });
@@ -95,6 +95,7 @@ class RouteBuilder
                 ->where('token = '.$queryBuilder->createPositionalParameter($token))
             ;
             $result = $query->execute()->fetchObject();
+
             if ($result && strpos($app['ramlToSilex.routeAccess']->{$routeName}, $result->role) !== false) {
                 return true;
             } else {
