@@ -33,7 +33,10 @@ $app->register(new Damack\RamlToSilex\RamlToSilexServiceProvider(), array(
     'ramlToSilex.config_file' => __DIR__ . '/config.json',
     'ramlToSilex.google-app-id' => 'id',
     'ramlToSilex.google-app-secret' => 'secret',
-    'ramlToSilex.google-redirect-uri' => 'http://localhost/'
+    'ramlToSilex.google-redirect-uri' => 'http://localhost/',
+    'ramlToSilex.customController' => function() use ($app) {
+        return new CustomController($app);
+    }
 ));
 ```
 
