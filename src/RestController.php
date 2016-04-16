@@ -162,7 +162,7 @@ class RestController
                 "token" => $token
             ), array('id' => $user['id']));
         }
-        return new RedirectResponse('https://'.$tenant.'/#/login?access_token='.$token);
+        return new RedirectResponse($this->app['ramlToSilex.redirectUri'].'?access_token='.$token);
     }
 
     public function getAuthGooglemeAction($objectType, Request $request) {

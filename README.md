@@ -33,9 +33,12 @@ $app->register(new Damack\RamlToSilex\RamlToSilexServiceProvider(), array(
     'ramlToSilex.config_file' => __DIR__ . '/config.json',
     'ramlToSilex.google-app-id' => 'id',
     'ramlToSilex.google-app-secret' => 'secret',
-    'ramlToSilex.google-redirect-uri' => 'http://localhost/'
+    'ramlToSilex.google-redirect-uri' => 'http://localhost/',
+    'ramlToSilex.redirectUri' => 'http://localhost/login.html',
+    'ramlToSilex.customController' => function() use ($app) {
+        return new CustomController($app);
+    }
 ));
-```
 
 - You need to give the path to the `RAML` file describing your API. You can find an example into the `tests/raml` directory
 - You need to give the path to the config file describing your access to the routs and custom controller
