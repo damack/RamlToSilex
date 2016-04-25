@@ -202,14 +202,14 @@ class RestController
             foreach($qSplit as $value) {
                 $valueSplit = explode(':', $value);
                 if (strlen($return) > 0) {
-                    $return .= ',';
+                    $return .= ' and ';
                 }
                 $return .= trim($valueSplit[0]) . "=" . $queryBuilder->createPositionalParameter($valueSplit[1]);
             }
         }
         foreach($foreignKeys as $key => $value) {
             if (strlen($return) > 0) {
-                $return .= ',';
+                $return .= ' and ';
             }
             $return .= $key . "=" . $queryBuilder->createPositionalParameter($value);
         }
