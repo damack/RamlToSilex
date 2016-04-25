@@ -31,7 +31,7 @@ class RouteBuilder
         $afterMiddleware = function (Request $request, Response $response) {
             $response->headers->set('Access-Control-Allow-Origin', '*');
             $response->headers->set('Access-Control-Allow-Methods', 'OPTIONS,GET,POST,PUT,DELETE');
-            $response->headers->set('Access-Control-Allow-Headers', 'accept, authorization, tenant');
+            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, accept, authorization, tenant');
         };
 
         foreach ($routes as $index => $route) {
