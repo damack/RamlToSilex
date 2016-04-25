@@ -28,6 +28,12 @@ class RouteBuilder
             }
         };
 
+        $afterMiddleware = function (Request $request, Response $response) {
+            $response->headers->set('Access-Control-Allow-Origin', '*');
+            $response->headers->set('Access-Control-Allow-Methods', 'OPTIONS,GET,POST,PUT,DELETE');
+            $response->headers->set('Access-Control-Allow-Headers', 'accept, authorization, tenant');
+        };
+
         foreach ($routes as $index => $route) {
             $route['method'] = $route['type'];
             $routePath = $route['method'].' '.$route['path'];
@@ -68,7 +74,13 @@ class RouteBuilder
                 ->method($route['method'])
                 ->setDefault('objectType', $route['objectType'])
                 ->setDefault('path', $routePath)
-                ->before($beforeMiddleware);
+                ->before($beforeMiddleware)
+                ->after($afterMiddleware);
+
+            $controllers
+                ->match($route['path'], function() { return new Response('', 200); })
+                ->method('OPTIONS')
+                ->after($afterMiddleware);
         }
 
         if ($app->get('ramlToSilex.apiConsole')) {
