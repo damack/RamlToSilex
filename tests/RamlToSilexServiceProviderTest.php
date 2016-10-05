@@ -3,34 +3,16 @@ namespace Damack\RamlToSilex;
 
 use Damack\RamlToSilex\RamlToSilexServiceProvider;
 use Damack\Custom\CustomController;
-use Doctrine\DBAL\Schema\Schema;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Session\Session;
+use PHPUnit\Framework\TestCase;
+use GuzzleHttp\Client;
 
-class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCase {
-    private $connection = null;
+class RamlToSilexServiceProviderTest extends TestCase {
     private $app = null;
-
-    /**
-     * @return PHPUnit_Extensions_Database_DB_IDatabaseConnection
-     */
-    public function getConnection() {
-        $config = new \Doctrine\DBAL\Configuration();
-        $connectionParams = array(
-            'driver' => 'pdo_sqlite',
-            'path' => __DIR__ . '/db.sqlite'
-        );
-        $this->connection = \Doctrine\DBAL\DriverManager::getConnection($connectionParams, $config);
-        return $this->createDefaultDBConnection($this->connection->getWrappedConnection(), 'api');
-    }
-
-    /**
-     * @return PHPUnit_Extensions_Database_DataSet_IDataSet
-     */
-    public function getDataSet() {
-        return new \PHPUnit_Extensions_Database_DataSet_YamlDataSet(__DIR__."/data.yml");
-    }
+    private $tenant = 'testsebastianpro';
 
     /**
      * @before
@@ -40,14 +22,9 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $app['debug'] = true;
 
         $app->register(new \Silex\Provider\ServiceControllerServiceProvider());
-        $app->register(new \Silex\Provider\DoctrineServiceProvider(), array(
-            'dbs.options' => array(
-                'test' => array(
-                    'driver' => 'pdo_sqlite',
-                    'path' => __DIR__ . '/db.sqlite'
-                )
-            ),
-        ));
+        $app->register(new \Silex\Provider\SessionServiceProvider(), [
+            'session.test' => true
+        ]);
         $app->register(new RamlToSilexServiceProvider(), array(
             'ramlToSilex.raml_file' => __DIR__ . '/raml/api.raml',
             'ramlToSilex.config_file' => __DIR__ . '/config.json',
@@ -56,35 +33,103 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
             'ramlToSilex.google-redirect-uri' => 'http://localhost/',
             'ramlToSilex.redirectUri' => 'http://localhost/login.html',
             'ramlToSilex.apiConsole' => false,
+            'ramlToSilex.yaas-client' => getenv("CLIENT"),
+            'ramlToSilex.yaas-client-id' => getenv("CLIENT_ID"),
+            'ramlToSilex.yaas-client-secret' => getenv("CLIENT_SECRET"),
             'ramlToSilex.customController' => function() use ($app) {
                 return new CustomController($app);
             }
         ));
         $this->app = $app;
+
+        $client = new Client(['base_uri' => 'https://api.yaas.io/']);
+        $response = $client->post('/hybris/oauth2/v1/token', [
+            'form_params' => [
+                'client_id' => getenv("CLIENT_ID"),
+                'client_secret' => getenv("CLIENT_SECRET"),
+                'grant_type' => 'client_credentials',
+                'scope' => 'hybris.tenant='.$this->tenant.' hybris.document_manage'
+            ]
+        ]);
+        $token = json_decode($response->getBody())->{'access_token'};
+        $client->delete('/hybris/document/v1/'.$this->tenant.'/'.getenv("CLIENT").'/data/users', [
+            'headers' => [
+                'Authorization' => 'Bearer '.$token
+            ]
+        ]);
+        $client->post('/hybris/document/v1/'.$this->tenant.'/'.getenv("CLIENT").'/data/users', [
+            'headers' => [
+                'Authorization' => 'Bearer '.$token
+            ],
+            'json' => [
+                'id' => 1,
+                'name' => "Hans Walter Admin",
+                'mail' => "hans.walter@gmail.com",
+                'role' => "Admin",
+                'token' => "admin",
+                'activ' => true,
+            ]
+        ]);
+        $client->post('/hybris/document/v1/'.$this->tenant.'/'.getenv("CLIENT").'/data/users', [
+            'headers' => [
+                'Authorization' => 'Bearer '.$token
+            ],
+            'json' => [
+                'id' => 2,
+                'name' => "Hans Walter Describer",
+                'mail' => "hans.walter@gmail.com",
+                'role' => "Describer",
+                'token' => "describer",
+                'activ' => true,
+            ]
+        ]);
+        $client->post('/hybris/document/v1/'.$this->tenant.'/'.getenv("CLIENT").'/data/users', [
+            'headers' => [
+                'Authorization' => 'Bearer '.$token
+            ],
+            'json' => [
+                'id' => 3,
+                'name' => "Hans Walter Anonymous",
+                'mail' => "hans.walter@gmail.com",
+                'role' => "Anonymous",
+                'token' => "anonymous",
+                'activ' => true,
+            ]
+        ]);
     }
 
     public function testGetList() {
         $request = Request::create('/users', 'GET');
         $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
-        $this->assertEquals('[{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1"},{"id":"2","name":"Hans Walter Describer","mail":"hans.walter@gmail.com","role":"Describer","activ":"1"},{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":"1"}]', $response->getContent());
+        $result = json_decode($response->getContent());
+        foreach($result as $object) {
+            unset($object->metadata);
+        }
+
+        $this->assertEquals('[{"name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":true,"id":"1"},{"name":"Hans Walter Describer","mail":"hans.walter@gmail.com","role":"Describer","activ":true,"id":"2"},{"name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":true,"id":"3"}]', json_encode($result));
     }
 
     public function testGetListQFilter() {
         $request = Request::create('/users?q=role:Admin', 'GET');
         $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
-        $this->assertEquals('[{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1"}]', $response->getContent());
+        $result = json_decode($response->getContent());
+        foreach($result as $object) {
+            unset($object->metadata);
+        }
+
+        $this->assertEquals('[{"name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":true,"id":"1"}]', json_encode($result));
     }
 
     public function testGetListAnonymous() {
         $request = Request::create('/users', 'GET');
         $request->headers->set('Authorization', 'Bearer anonymous');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
         $this->assertEquals(401, $response->getStatusCode());
@@ -93,7 +138,7 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
     public function testPost() {
         $request = Request::create('/users', 'POST', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test", "mail":"test@test.de", "token":"test", "role":"Admin", "activ":true}');
         $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -102,16 +147,19 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
     public function testGet() {
         $request = Request::create('/users/3', 'GET');
         $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
-        $this->assertEquals('{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":"1"}', $response->getContent());
+        $result = json_decode($response->getContent());
+        unset($result->metadata);
+
+        $this->assertEquals('{"name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":true,"id":"3"}', json_encode($result));
     }
 
     public function testPut() {
         $request = Request::create('/users/3', 'PUT', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test"}');
         $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -120,7 +168,7 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
     public function testDelete() {
         $request = Request::create('/users/3', 'DELETE');
         $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
         $this->assertEquals(204, $response->getStatusCode());
@@ -128,43 +176,25 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
 
     public function testAuthGoogleMe() {
         $request = Request::create('/auth/google/me', 'GET');
-        $request->headers->set('Authorization', 'Bearer anonymous');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Authorization', 'Bearer admin');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
-        $this->assertEquals('{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":"1"}', $response->getContent());
+        $result = json_decode($response->getContent());
+        unset($result->metadata);
+
+        $this->assertEquals('{"name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":true,"id":"1"}', json_encode($result));
     }
 
     public function testCustomController() {
-        $request = Request::create('/users/3/test', 'PUT');
+        $request = Request::create('/users/2/test', 'PUT');
         $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
-        $response = $this->app->handle($request);
-        $this->assertEquals('{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1","token":"admin"}', $response->getContent());
-    }
-
-    public function testToDoPost() {
-        $request = Request::create('/users/1/todos', 'POST', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test"}');
-        $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
+        $request->headers->set('Tenant', $this->tenant);
         $response = $this->app->handle($request);
 
-        $this->assertEquals(201, $response->getStatusCode());
-    }
+        $result = json_decode($response->getContent());
+        unset($result->metadata);
 
-    public function testToDoGetList() {
-        $request = Request::create('/users/2/todos', 'GET');
-        $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
-        $response = $this->app->handle($request);
-
-        $this->assertEquals('[]', $response->getContent());
-
-        $request = Request::create('/users/1/todos', 'GET');
-        $request->headers->set('Authorization', 'Bearer admin');
-        $request->headers->set('Tenant', 'test');
-        $response = $this->app->handle($request);
-
-        $this->assertEquals('[{"id":"1","name":"Test"}]', $response->getContent());
+        $this->assertEquals('{"name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","token":"admin","activ":true,"id":"1"}', json_encode($result));
     }
 }

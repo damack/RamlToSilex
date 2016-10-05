@@ -1,6 +1,6 @@
 # RamlToSilex
 
-RamlToSilex is a Silex provider to setting up a REST API on top of a relational database, based on a YAML (RAML) configuration file.
+RamlToSilex is a Silex provider to setting up a REST API on top of a YaaS Document service, based on a YAML (RAML) configuration file.
 
 ## What is RAML ?
 
@@ -20,14 +20,7 @@ Enable `ServiceController`, `Doctrine` and `RamlToSilex` service providers in yo
 $app = new Application();
 
 $app->register(new \Silex\Provider\ServiceControllerServiceProvider());
-$app->register(new \Silex\Provider\DoctrineServiceProvider(), array(
-    'dbs.options' => array(
-        'test' => array(
-            'driver' => 'pdo_sqlite',
-            'path' => __DIR__ . '/db.sqlite'
-        )
-    ),
-));
+$app->register(new \Silex\Provider\SessionServiceProvider());
 $app->register(new Damack\RamlToSilex\RamlToSilexServiceProvider(), array(
     'ramlToSilex.raml_file' => __DIR__ . '/raml/api.raml',
     'ramlToSilex.config_file' => __DIR__ . '/config.json',
@@ -35,6 +28,9 @@ $app->register(new Damack\RamlToSilex\RamlToSilexServiceProvider(), array(
     'ramlToSilex.google-app-secret' => 'secret',
     'ramlToSilex.google-redirect-uri' => 'http://localhost/',
     'ramlToSilex.redirectUri' => 'http://localhost/login.html',
+    'ramlToSilex.yaas-client' => 'xxx',
+    'ramlToSilex.yaas-client-id' => 'xxx',
+    'ramlToSilex.yaas-client-secret' => 'xxx',
     'ramlToSilex.customController' => function() use ($app) {
         return new CustomController($app);
     }
@@ -45,7 +41,6 @@ $app->register(new Damack\RamlToSilex\RamlToSilexServiceProvider(), array(
 - You need to give the app-id, app-secret and redirect-uri so google auth can work
 
 ## Function
-- Create table from schema definition
 - Goolge OAuth authentication
 - API authentication with token
 - Role based access to routes

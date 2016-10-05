@@ -5,6 +5,7 @@ namespace Damack\RamlToSilex;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use GuzzleHttp\Client;
 
 class RouteBuilder
 {
@@ -100,15 +101,18 @@ class RouteBuilder
             $token = $request->headers->get('Authorization') ? $request->headers->get('Authorization') : getallheaders()['Authorization'];
             $token = str_replace('Bearer ', '', $token);
 
-            $queryBuilder = $app['dbs'][$tenant]->createQueryBuilder();
-            $query = $queryBuilder
-                ->select('*')
-                ->from('users')
-                ->where('token = '.$queryBuilder->createPositionalParameter($token))
-            ;
-            $result = $query->execute()->fetchObject();
+            $client = new Client(['base_uri' => 'https://api.yaas.io/']);
+            $res = $client->get('/hybris/document/v1/'.$tenant.'/'.$app['ramlToSilex.yaas-client'].'/data/users', [
+                'headers' => [
+                    'Authorization' => 'Bearer '.$this->getToken($app, $client, $tenant)
+                ],
+                'query' => [
+                    'q' => 'token:'.$token
+                ]
+            ]);
+            $results = json_decode($res->getBody());
 
-            if ($result && strpos($app['ramlToSilex.routeAccess']->{$routeName}, $result->role) !== false) {
+            if ($results && strpos($app['ramlToSilex.routeAccess']->{$routeName}, $results[0]->role) !== false) {
                 return true;
             } else {
                 return false;
@@ -116,5 +120,22 @@ class RouteBuilder
         } else {
             return true;
         }
+    }
+
+    private function getToken($app, $client, $tenant) {
+        if(null === $token = $app['session']->get('token'.$tenant)) {
+            $response = $client->post('/hybris/oauth2/v1/token', [
+                'form_params' => [
+                    'client_id' => $app['ramlToSilex.yaas-client-id'],
+                    'client_secret' => $app['ramlToSilex.yaas-client-secret'],
+                    'grant_type' => 'client_credentials',
+                    'scope' => 'hybris.tenant='.$tenant.' hybris.document_view hybris.document_manage'
+                ]
+            ]);
+            $token = json_decode($response->getBody())->{'access_token'};
+            $app['session']->set('token'.$tenant, $token);
+            return $token;
+        }
+        return $token;
     }
 }
