@@ -108,7 +108,7 @@ class RouteBuilder
             ;
             $result = $query->execute()->fetchObject();
 
-            if ($result && strpos($app['ramlToSilex.routeAccess']->{$routeName}, $result->role) !== false) {
+            if ($result && strpos($app['ramlToSilex.routeAccess']->{$routeName}, $result->role) !== false && $result->active == 1) {
                 return true;
             } else {
                 return false;

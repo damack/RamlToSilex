@@ -34,6 +34,7 @@ class RestController
     {
         $tenant = $request->headers->get('Tenant');
         $foreignKeys = $this->getForeignKeys($request->attributes);
+        
         $this->createTable($tenant, $objectType, $foreignKeys);
         $queryBuilder = $this->dbal[$tenant]
             ->createQueryBuilder()
@@ -47,7 +48,7 @@ class RestController
             $queryBuilder->where($where);
         }
         if ($sort = $request->query->get('sort')) {
-            $queryBuilder->orderBy(explode(',', $sort)[0], explode(',', $sort)[1]);
+            $queryBuilder->orderBy(explode(':', $sort)[0], explode(':', $sort)[1]);
         }
 
         $countQueryBuilderModifier = function ($queryBuilder) {
@@ -60,8 +61,8 @@ class RestController
         $pager = new DoctrineDbalAdapter($queryBuilder, $countQueryBuilderModifier);
 
         $nbResults = $pager->getNbResults();
-        $page = $request->query->get('page', 1);
-        $size = $request->query->get('size', 20);
+        $page = $request->query->get('pageNumber', 1);
+        $size = $request->query->get('pageSize', 20);
         $results = $pager->getSlice(($page - 1) * $size, $page * $size);
 
         foreach($results as &$obj) {
@@ -78,16 +79,23 @@ class RestController
         $tenant = $request->headers->get('Tenant');
         $foreignKeys = $this->getForeignKeys($request->attributes);
         $this->createTable($tenant, $objectType, $foreignKeys);
+        
+        $data = $request->request->all();
+        if(!array_key_exists('id', $data)) {
+            $id = $this->createId();
+            $data["id"] = $id;
+        } else {
+            $id = $data["id"];
+        }
+        $this->convertToSql($objectType, $data);
+        
         try {
-            $this->dbal[$tenant]->insert($objectType, array_merge($request->request->all(), $foreignKeys));
+            $this->dbal[$tenant]->insert($objectType, array_merge($data, $foreignKeys));
         } catch (\Exception $e) {
             return new JsonResponse(array(
                 'errors' => array('detail' => $e->getMessage()),
             ), 400);
         }
-
-        $id = (integer) $this->dbal[$tenant]->lastInsertId();
-
 
         return new JsonResponse(array("id"=>$id), 201);
     }
@@ -116,7 +124,8 @@ class RestController
         $tenant = $request->headers->get('Tenant');
         $data = $request->request->all();
         $request->request->remove('id');
-
+        $this->convertToSql($objectType, $data);
+        
         $result = $this->dbal[$tenant]->update($objectType, $data, array('id' => $objectId));
         if (0 === $result) {
             return new Response('', 404);
@@ -153,9 +162,12 @@ class RestController
         $user = $this->dbal[$tenant]->fetchAssoc('SELECT * FROM '.$objectType.' WHERE mail = ?', array($gUser->getEmail()));
         if ($user == null) {
             $this->dbal[$tenant]->insert($objectType, array(
+                "id" => $this->createId(),
                 "name" => $gUser->getName(),
                 "mail" => $gUser->getEmail(),
-                "token" => $token
+                "token" => $token,
+                "role" => "Anonymous",
+                "active" => 1
             ));
         } else if ($user['token'] !== $token) {
             $this->dbal[$tenant]->update($objectType, array(
@@ -202,7 +214,7 @@ class RestController
             foreach($qSplit as $value) {
                 $valueSplit = explode(':', $value);
                 if (strlen($return) > 0) {
-                    $return .= ' and ';
+                    $return .= ' or ';
                 }
                 $return .= trim($valueSplit[0]) . "=" . $queryBuilder->createPositionalParameter($valueSplit[1]);
             }
@@ -215,15 +227,86 @@ class RestController
         }
         return $return;
     }
+    
+    private function createId()
+    {
+        static $inc = 0;
 
+        $ts = pack( 'N', time() );
+        $m = substr( md5( gethostname()), 0, 3 );
+        $pid = pack( 'n', posix_getpid() );
+        $trail = substr( pack( 'N', $inc++ ), 1, 3);
+
+        $bin = sprintf("%s%s%s%s", $ts, $m, $pid, $trail);
+
+        $id = '';
+        for ($i = 0; $i < 12; $i++ )
+        {
+            $id .= sprintf("%02X", ord($bin[$i]));
+        }
+        return $id;
+    }
+    
+    private function convertToSql($schemaName, &$obj) {
+        $apiDefinition = $this->app['ramlToSilex.apiDefinition'];
+        foreach ($apiDefinition->getSchemaCollections() as $schema) {
+            if (key($schema) == $schemaName) {
+                $schemaDef = json_decode($schema[$schemaName]);
+                foreach($schemaDef->properties as $key => $value) {
+                    if ($value->type === "boolean") {
+                        if($obj[$key] == true) {
+                            $obj[$key] = 1;
+                        } else {
+                            $obj[$key] = 0;
+                        }
+                    }
+                    if ($value->type === "array") {
+                        if ($value->items->type === "string") {
+                            $obj[$key] = implode(",", $obj[$key]);
+                        } else {
+                            $obj[$key] = json_encode($obj[$key]);
+                        }
+                    }
+                    if($key === "values") {
+                        $obj["`values`"] = $obj[$key];
+                        unset($obj[$key]);
+                    }
+                }
+            }
+        }
+    }
+    
     private function removeHiddenFields($schemaName, &$obj, $foreignKeys = array()) {
         $apiDefinition = $this->app['ramlToSilex.apiDefinition'];
         foreach ($apiDefinition->getSchemaCollections() as $schema) {
             if (key($schema) == $schemaName) {
                 $schemaDef = json_decode($schema[$schemaName]);
-                foreach($schemaDef->items->properties as $key => $value) {
+                foreach($schemaDef->properties as $key => $value) {
                     if (property_exists($value,'hidden') && $value->hidden === true) {
                         unset($obj[$key]);
+                    }
+                    if ($value->type === "boolean") {
+                        if($obj[$key] == 1) {
+                            $obj[$key] = true;
+                        } else {
+                            $obj[$key] = false;
+                        }
+                    }
+                    if ($value->type === "array") {
+                        if ($value->items->type === "string") {
+                            $obj[$key] = explode(",", $obj[$key]);
+                        } else {
+                            $obj[$key] = json_decode($obj[$key]);
+                        }
+                    }
+                    if ($value->type === "object") {
+                        $obj[$key] = json_decode($obj[$key]);
+                    }
+                    if ($value->type === "float") {
+                        $obj[$key] = floatval($obj[$key]);
+                    }
+                    if ($value->type === "integer") {
+                        $obj[$key] = intval($obj[$key]);
                     }
                 }
             }
@@ -248,40 +331,35 @@ class RestController
         if ($findTable == false) {
             $apiDefinition = $this->app['ramlToSilex.apiDefinition'];
             $tableSchema = new Schema();
-
+            
             $table = $tableSchema->createTable($name);
-            $table->addColumn("id", "integer", array("unsigned" => true, "autoincrement" => true));
-            $table->setPrimaryKey(array("id"));
-
             foreach ($apiDefinition->getSchemaCollections() as $schema) {
                 if (key($schema) == $name) {
                     $schemaDef = json_decode($schema[$name]);
-                    foreach($schemaDef->items->properties as $key => $value) {
-                        if ($key != "id") {
-                            $property = [];
-
-                            if ($schemaDef->items->required && array_search($key, $schemaDef->items->required) != null) {
-                                $property["notnull"] = false;
-                            }
-                            if (property_exists($value, "default")) {
-                                $property["default"] = $value->default;
-                            }
-
-                            if (property_exists($value, "enum")) {
-                                $table->addColumn($key, $value->type, $property);
-                            } else {
-                                $table->addColumn($key, $value->type, $property);
-                            }
+                    foreach($schemaDef->properties as $key => $value) {
+                        $property = [];
+                        if ($schemaDef->required && array_search($key, $schemaDef->required) != null) {
+                            $property["notnull"] = false;
+                        }
+                        if (property_exists($value, "default")) {
+                            $property["default"] = $value->default;
+                        }
+                        
+                        if (property_exists($value, "enum")) {
+                            $table->addColumn($key, $value->type, $property);
+                        } else {
+                            $table->addColumn($key, $value->type, $property);
                         }
                     }
 
                     //Add foreign keys
                     foreach($foreignKeys as $key => $value) {
-                        $table->addColumn($key, 'integer');
+                        $table->addColumn($key, 'string');
                     }
                 }
             }
-
+            $table->setPrimaryKey(array("id"));
+            
             $queries = $tableSchema->toSql($this->dbal[$tenant]->getDatabasePlatform());
             foreach ($queries as $query) {
                 $this->dbal[$tenant]->query($query);

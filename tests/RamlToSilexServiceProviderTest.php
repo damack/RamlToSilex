@@ -69,16 +69,16 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
 
-        $this->assertEquals('[{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1"},{"id":"2","name":"Hans Walter Describer","mail":"hans.walter@gmail.com","role":"Describer","activ":"1"},{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":"1"}]', $response->getContent());
+        $this->assertEquals('[{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","active":true},{"id":"2","name":"Hans Walter Describer","mail":"hans.walter@gmail.com","role":"Describer","active":true},{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","active":true}]', $response->getContent());
     }
-
+    
     public function testGetListQFilter() {
         $request = Request::create('/users?q=role:Admin', 'GET');
         $request->headers->set('Authorization', 'Bearer admin');
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
 
-        $this->assertEquals('[{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1"}]', $response->getContent());
+        $this->assertEquals('[{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","active":true}]', $response->getContent());
     }
 
     public function testGetListAnonymous() {
@@ -91,7 +91,7 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
     }
 
     public function testPost() {
-        $request = Request::create('/users', 'POST', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test", "mail":"test@test.de", "token":"test", "role":"Admin", "activ":true}');
+        $request = Request::create('/users', 'POST', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test", "mail":"test@test.de", "token":"test", "role":"Admin", "active":true}');
         $request->headers->set('Authorization', 'Bearer admin');
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
@@ -105,15 +105,15 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
 
-        $this->assertEquals('{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":"1"}', $response->getContent());
+        $this->assertEquals('{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","active":true}', $response->getContent());
     }
 
     public function testPut() {
-        $request = Request::create('/users/3', 'PUT', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test"}');
+        $request = Request::create('/users/3', 'PUT', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test", "active": true}');
         $request->headers->set('Authorization', 'Bearer admin');
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
-
+        
         $this->assertEquals(200, $response->getStatusCode());
     }
 
@@ -132,7 +132,7 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
 
-        $this->assertEquals('{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","activ":"1"}', $response->getContent());
+        $this->assertEquals('{"id":"3","name":"Hans Walter Anonymous","mail":"hans.walter@gmail.com","role":"Anonymous","active":true}', $response->getContent());
     }
 
     public function testCustomController() {
@@ -140,11 +140,11 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $request->headers->set('Authorization', 'Bearer admin');
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
-        $this->assertEquals('{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","role":"Admin","activ":"1","token":"admin"}', $response->getContent());
+        $this->assertEquals('{"id":"1","name":"Hans Walter Admin","mail":"hans.walter@gmail.com","token":"admin","role":"Admin","active":"1"}', $response->getContent());
     }
 
     public function testToDoPost() {
-        $request = Request::create('/users/1/todos', 'POST', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"name":"Test"}');
+        $request = Request::create('/users/1/todos', 'POST', array(), array(), array(), array('CONTENT_TYPE' => 'application/json'), '{"id":"1", "name":"Test"}');
         $request->headers->set('Authorization', 'Bearer admin');
         $request->headers->set('Tenant', 'test');
         $response = $this->app->handle($request);
@@ -166,5 +166,14 @@ class RamlToSilexServiceProviderTest extends \PHPUnit_Extensions_Database_TestCa
         $response = $this->app->handle($request);
 
         $this->assertEquals('[{"id":"1","name":"Test"}]', $response->getContent());
+    }
+    
+    public function testToDoDelete() {
+        $request = Request::create('/users/1/todos/1', 'DELETE');
+        $request->headers->set('Authorization', 'Bearer admin');
+        $request->headers->set('Tenant', 'test');
+        $response = $this->app->handle($request);
+
+        $this->assertEquals(204, $response->getStatusCode());
     }
 }

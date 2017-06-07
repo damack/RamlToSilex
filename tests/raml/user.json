@@ -1,30 +1,31 @@
 {
-	"$schema": "http://json-schema.org/draft-04/schema#",
-	"title": "User",
-	"type": "object",
-	"properties": {
-		"id": {
-			"type": "integer"
-		},
-		"name": {
-			"type": "string"
-		},
-		"mail": {
-			"type": "string"
-		},
-		"role": {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "users",
+    "title": "users",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "name": {
+            "type": "string"
+        },
+        "mail": {
+            "type": "string"
+        },
+        "role": {
             "type": "string",
-			"enum": ["Admin", "Describer", "Anonymous"],
+            "enum": ["Admin", "Describer", "Anonymous"],
             "default": "Anonymous"
-		},
-		"activ": {
-			"type": "boolean",
+        },
+        "active": {
+            "type": "boolean",
             "default": 0
-		},
+        },
         "token": {
-			"type": "string",
+            "type": "string",
             "hidden": true
-		}
-	},
-	"required": ["name", "mail", "token"]
+        }
+    },
+    "required": ["name", "mail", "token"]
 }
