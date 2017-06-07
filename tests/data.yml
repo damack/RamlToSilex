@@ -5,18 +5,18 @@ users:
     mail: "hans.walter@gmail.com"
     role: "Admin"
     token: "admin"
-    activ: true
+    active: true
   -
     id: 2
     name: "Hans Walter Describer"
     mail: "hans.walter@gmail.com"
     role: "Describer"
     token: "describer"
-    activ: true
+    active: true
   -
     id: 3
     name: "Hans Walter Anonymous"
     mail: "hans.walter@gmail.com"
     role: "Anonymous"
     token: "anonymous"
-    activ: true
+    active: true
