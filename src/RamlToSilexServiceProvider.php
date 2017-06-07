@@ -4,11 +4,13 @@ namespace Damack\RamlToSilex;
 
 use Raml\Parser;
 use Silex\Application;
-use Silex\ServiceProviderInterface;
+use Silex\Api\BootableProviderInterface;
+use Pimple\Container;
+use Pimple\ServiceProviderInterface;
 
-class RamlToSilexServiceProvider implements ServiceProviderInterface
+class RamlToSilexServiceProvider implements ServiceProviderInterface, BootableProviderInterface
 {
-    public function register(Application $app)
+    public function register(Container $app)
     {
         $app['ramlToSilex.initializer'] = $app->protect(function () use ($app) {
             if (!is_readable($ramlFile = $app['ramlToSilex.raml_file'])) {
@@ -24,13 +26,13 @@ class RamlToSilexServiceProvider implements ServiceProviderInterface
             if (property_exists($configFile, 'controllers')) {
                 $app['ramlToSilex.customControllerMapping'] = $configFile->controllers;
             }
-            $app['ramlToSilex.restController'] = $app->share(function () use ($app) {
+            $app['ramlToSilex.restController'] = function () use ($app) {
                 return new RestController($app);
-            });
+            };
 
-            $app['ramlToSilex.routeBuilder'] = $app->share(function () {
+            $app['ramlToSilex.routeBuilder'] = function () {
                 return new RouteBuilder();
-            });
+            };
 
         });
 
