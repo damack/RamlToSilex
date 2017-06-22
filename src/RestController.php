@@ -103,11 +103,14 @@ class RestController
     public function getObjectAction($objectId, $objectType, Request $request)
     {
         $tenant = $request->headers->get('Tenant');
+        $foreignKeys = $this->getForeignKeys($request->attributes);
+
         $queryBuilder = $this->dbal[$tenant]->createQueryBuilder();
+        $q = $this->createWhere($queryBuilder, "id:".$objectId, $foreignKeys);
         $query = $queryBuilder
             ->select('*')
             ->from($objectType)
-            ->where('id = '.$queryBuilder->createPositionalParameter($objectId))
+            ->where($q)
         ;
 
         $result = $query->execute()->fetch(PDO::FETCH_ASSOC);;
@@ -122,11 +125,13 @@ class RestController
     public function putObjectAction($objectId, $objectType, Request $request)
     {
         $tenant = $request->headers->get('Tenant');
+        $foreignKeys = $this->getForeignKeys($request->attributes);
+
         $data = $request->request->all();
         $request->request->remove('id');
         $this->convertToSql($objectType, $data);
         
-        $result = $this->dbal[$tenant]->update($objectType, $data, array('id' => $objectId));
+        $result = $this->dbal[$tenant]->update($objectType, $data, array_merge(['id' => $objectId], $foreignKeys));
         if (0 === $result) {
             return new Response('', 404);
         }
@@ -147,12 +152,15 @@ class RestController
 
     public function getAuthGoogleAction($objectType, Request $request)
     {
-        return new RedirectResponse($this->provider->getAuthorizationUrl(['state' => $request->get('tenant')]));
+        return new RedirectResponse($this->provider->getAuthorizationUrl(['state' => $request->get('state')]));
     }
 
     public function getAuthGooglecallbackAction($objectType, Request $request)
     {
-        $tenant = $request->get('state');
+        $state = explode(",", $request->get('state'));
+
+        $tenant = $state[0];
+        $redirectUri = $state[1];
         $token = $this->provider->getAccessToken('authorization_code', [
             'code' => $request->get('code')
         ]);
@@ -174,7 +182,7 @@ class RestController
                 "token" => $token
             ), array('id' => $user['id']));
         }
-        return new RedirectResponse($this->app['ramlToSilex.redirectUri'].'?access_token='.$token);
+        return new RedirectResponse($redirectUri.'?access_token='.$token);
     }
 
     public function getAuthGooglemeAction($objectType, Request $request) {
@@ -255,20 +263,24 @@ class RestController
                 foreach($schemaDef->properties as $key => $value) {
                     if ($value->type === "boolean") {
                         if($obj[$key] == true) {
-                            $obj[$key] = 1;
+                            $obj["`".$key."`"] = 1;
+                            unset($obj[$key]);
                         } else {
-                            $obj[$key] = 0;
+                            $obj["`".$key."`"] = 0;
+                            unset($obj[$key]);
                         }
                     }
                     if ($value->type === "array") {
                         if ($value->items->type === "string") {
-                            $obj[$key] = implode(",", $obj[$key]);
+                            $obj["`".$key."`"] = implode(",", $obj[$key]);
+                            unset($obj[$key]);
                         } else {
-                            $obj[$key] = json_encode($obj[$key]);
+                            $obj["`".$key."`"] = json_encode($obj[$key]);
+                            unset($obj[$key]);
                         }
                     }
-                    if($key === "values") {
-                        $obj["`values`"] = $obj[$key];
+                    if ($value->type === "object") {
+                        $obj["`".$key."`"] = json_encode($obj[$key]);
                         unset($obj[$key]);
                     }
                 }
@@ -294,7 +306,11 @@ class RestController
                     }
                     if ($value->type === "array") {
                         if ($value->items->type === "string") {
-                            $obj[$key] = explode(",", $obj[$key]);
+                            if(strlen($obj[$key]) == 0) {
+                                $obj[$key] = [];
+                            } else {
+                                $obj[$key] = explode(",", $obj[$key]);
+                            }
                         } else {
                             $obj[$key] = json_decode($obj[$key]);
                         }
@@ -332,6 +348,7 @@ class RestController
             $apiDefinition = $this->app['ramlToSilex.apiDefinition'];
             $tableSchema = new Schema();
             
+            $keys = ["id"];
             $table = $tableSchema->createTable($name);
             foreach ($apiDefinition->getSchemaCollections() as $schema) {
                 if (key($schema) == $name) {
@@ -355,10 +372,11 @@ class RestController
                     //Add foreign keys
                     foreach($foreignKeys as $key => $value) {
                         $table->addColumn($key, 'string');
+                        array_push($keys, $key);
                     }
                 }
             }
-            $table->setPrimaryKey(array("id"));
+            $table->setPrimaryKey($keys);
             
             $queries = $tableSchema->toSql($this->dbal[$tenant]->getDatabasePlatform());
             foreach ($queries as $query) {
